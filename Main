@@ -1,0 +1,44 @@
+import numpy as np
+from scipy.integrate import solve_ivp
+from plotly.subplots import make_subplots
+
+N= 20
+q=100 #L/min
+rho = 1000 #g/L
+Cp= 0.239 #J/gK
+negHr= 5e4 #J/mol
+ER = 8750 #k
+ko = 7.2e10 #1/min
+tco = 300
+cao = np.full(N,0.5) #mol/L
+To= np.full(N, 338.5) #K
+Tc = 300 #K
+totV= 100 #L
+v=totV/N
+UA = 5e4/N #J/minK
+vec0= np.r_[cao, To]
+
+def cin(t):
+  return 1
+def Ti(t):
+  return 338.5
+
+def rhs(t, vec):
+  ca, T = np.split(vec, 2)
+  k= ko*np.exp(-ER/T)
+  dc0 = q/v*(cin(t)-ca[0]) - k[0]*ca[0]
+  dc1_n= q/v*(ca[:-1]-ca[1:]) -k[1:]*ca[1:]
+  dT0= q/v*(Ti(t)-T[0])+negHr*k[0]*ca[0]/(rho*Cp)-UA*(T[0]-Tc)/(rho*v*Cp)
+  dT1_n= q/v*(T[:-1]-T[1:])+negHr*k[1:]*ca[1:]/(rho*Cp)-UA*(T[1:]-Tc)/(rho*v*Cp)
+  return np.r_[dc0, dc1_n, dT0, dT1_n]
+
+tend= 2  #min
+res= solve_ivp(rhs, [0,tend], vec0, method= 'Radau', dense_output= True)
+
+tplot = np.linspace(0, tend, 101)
+cplot, Tplot = np.split(res.sol(tplot), 2, axis=0)
+fig = make_subplots(rows= 1, cols=2)
+for i in range(N):
+ fig.add_scatter(x= tplot, y= cplot[i,:], name= f'C{i}', row= 1, col=1)
+ fig.add_scatter(x= tplot, y= Tplot[i,:], name= f'T{i}', row= 1, col=2)
+fig.update_layout(width=800, height= 400)
